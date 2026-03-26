@@ -1,0 +1,929 @@
+/* ==========================================================================
+   Z-INDEX LAYERS
+   0   - Canvas background
+   100 - Page content (cards / homepage hero)
+   200 - Chrome (nav, footer, controls)
+   210 - Dropdowns (lang menu)
+   9999 - Custom cursor
+   ========================================================================== */
+
+* { margin: 0; padding: 0; }
+
+:root {
+  --mono-font: 'Space Mono', 'SFMono-Regular', ui-monospace, monospace;
+  --serif-font: 'Source Serif 4', Georgia, serif;
+  --viewport-height: 100vh;
+  --chrome-inset: 75px;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --viewport-height: 100dvh;
+  }
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+html:has(.homepage-hero),
+html:has(.content-overlay) {
+  overflow: hidden;
+}
+
+html::-webkit-scrollbar { width: 6px; }
+html::-webkit-scrollbar-track { background: transparent; }
+html::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+html::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+html, body {
+  background: #1a1a1a;
+}
+
+body:has(.content-overlay),
+body:has(.homepage-hero) {
+  overflow: hidden;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+*, *::before, *::after { cursor: none !important; }
+
+/* ==========================================================================
+   Custom Cursor
+   ========================================================================== */
+
+.cursor-ring {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  width: 40px; height: 40px;
+  border: 1.5px solid rgba(255,255,255,0.6);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s, border-color 0.3s, opacity 0.3s;
+  mix-blend-mode: difference;
+}
+
+.cursor-ring.is-clicking {
+  width: 56px; height: 56px;
+  border-color: rgba(255,255,255,0.9);
+}
+
+.cursor-dot {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  width: 5px; height: 5px;
+  background: #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: difference;
+}
+
+.touch-device .cursor-dot,
+.touch-device .cursor-ring {
+  display: none !important;
+}
+
+.touch-device *, .touch-device *::before, .touch-device *::after {
+  cursor: auto !important;
+}
+
+/* ==========================================================================
+   LAYER 0: Canvas Background
+   ========================================================================== */
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: var(--viewport-height);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  image-rendering: auto;
+  opacity: 0;
+  transition: opacity 1000ms ease;
+}
+
+canvas.shader-ready {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   LAYER 100: Page Content
+   ========================================================================== */
+
+.page {
+  position: relative;
+  z-index: 100;
+}
+
+/* --- Homepage hero --- */
+
+body:has(.homepage-hero) .page {
+  pointer-events: none;
+}
+
+.homepage-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  height: var(--viewport-height);
+  color: #fff;
+  text-align: center;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+.homepage-hero h1 {
+  font: 3rem/1 var(--mono-font);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(0,0,0,0.8);
+  animation: breathe 4s ease-in-out infinite;
+}
+
+.homepage-hero p {
+  margin-top: 1rem;
+  font: 1rem/1.5 var(--mono-font);
+  opacity: 0.7;
+}
+
+.hero-flag {
+  display: inline-block;
+  vertical-align: middle;
+  width: 20px;
+  height: auto;
+  margin-left: 6px;
+  opacity: 0.7;
+}
+
+/* --- Floating content card --- */
+
+.content-overlay {
+  position: fixed;
+  top: calc(var(--chrome-inset) + 30px);
+  bottom: calc(var(--chrome-inset) + 30px);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.content-card {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 var(--chrome-inset);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 48px 52px 56px;
+  color: rgba(255, 255, 255, 0.88);
+  font: 16px/1.7 var(--serif-font);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  overflow-y: auto;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+.content-card::-webkit-scrollbar { width: 5px; }
+.content-card::-webkit-scrollbar-track { background: transparent; }
+.content-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+.content-card::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+.close-btn {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  font-size: 22px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.35);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.content-card h1 {
+  font: 2rem/1.2 var(--mono-font);
+  letter-spacing: 0.05em;
+  margin-bottom: 1.5rem;
+  color: #fff;
+}
+
+.content-card h2 {
+  font: 1.4rem/1.3 var(--mono-font);
+  letter-spacing: 0.03em;
+  margin: 2rem 0 1rem;
+  color: #fff;
+}
+
+.content-card p {
+  margin-bottom: 1.2em;
+}
+
+.content-card a {
+  color: rgba(255, 255, 255, 0.95);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s;
+}
+
+.content-card a:hover {
+  color: #fff;
+}
+
+.content-card ul,
+.content-card ol {
+  margin: 1em 0;
+  padding-left: 0;
+  list-style-position: inside;
+}
+
+.content-card li {
+  margin-bottom: 0.2em;
+}
+
+.content-card li p {
+  margin-bottom: 0;
+}
+
+.content-card em, .content-card i {
+  font-style: italic;
+}
+
+.content-card code {
+  font-family: var(--mono-font);
+  font-size: 0.9em;
+}
+
+.content-card pre {
+  margin: 1.5em 0;
+  padding: 1em 1.2em;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow-x: auto;
+}
+
+.content-card pre code {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Tables */
+.content-card table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font: 14px/1.5 var(--mono-font);
+}
+
+.content-card th,
+.content-card td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.content-card th {
+  font-weight: 700;
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Blockquotes */
+.content-card blockquote {
+  margin: 1.5em 0;
+  padding: 0.8em 1.2em;
+  border-left: 2px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+.content-card blockquote p {
+  margin-bottom: 0;
+}
+
+/* Definition lists */
+.content-card dt {
+  font: 14px/1.5 var(--mono-font);
+  font-weight: 700;
+  color: #fff;
+  margin-top: 1em;
+}
+
+.content-card dd {
+  margin: 0.3em 0 0 1.5em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Footnotes */
+.content-card .footnote {
+  margin-top: 1em;
+  padding-top: 0;
+  border-top: none;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.content-card .footnote hr {
+  display: none;
+}
+
+.content-card .footnote ol {
+  padding-left: 1.5em;
+  list-style-position: outside;
+}
+
+.content-card .footnote li {
+  margin-bottom: 0.3em;
+}
+
+.content-card .footnote + .content-sig {
+  border-top: none;
+  margin-top: 1.5rem;
+}
+
+/* Abbreviations */
+.content-card abbr[data-tip] {
+  text-decoration: underline dotted rgba(255, 255, 255, 0.4);
+  text-underline-offset: 3px;
+  position: relative;
+}
+
+.content-card abbr[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: 100%;
+  left: 0;
+  padding: 4px 10px;
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  font: 12px/1.4 var(--mono-font);
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  margin-top: 4px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Horizontal rules */
+.content-card hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 2em 0;
+}
+
+.content-card strong, .content-card b {
+  font-weight: 700;
+}
+
+
+/* Content signature (shared between card and fullpage) */
+.content-sig {
+  margin-top: 3rem;
+  margin-bottom: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font: 12px/1.5 var(--mono-font);
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+/* Blog post specific */
+.post-header {
+  margin-bottom: 2rem;
+}
+
+.post-header h1 {
+  margin-bottom: 0.5rem;
+}
+
+.post-meta {
+  font: 14px/1.5 var(--mono-font);
+  opacity: 0.6;
+}
+
+.post-body {
+  font: 14px/1.7 var(--serif-font);
+}
+
+
+.post-body li {
+  margin-bottom: 0.1em;
+}
+
+.post-body li p {
+  margin-bottom: 0;
+}
+
+.post-body p {
+  margin-bottom: 1.2em;
+}
+
+.back-link {
+  display: inline-block;
+  margin-top: 3rem;
+  font: 14px/1 var(--mono-font);
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.post-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 0;
+  margin-bottom: -28px;
+  padding-top: 0;
+  font: 11px/1.4 var(--mono-font);
+  gap: 1rem;
+}
+
+.post-nav a {
+  color: rgba(255, 255, 255, 0.3);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.post-nav a:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.post-nav-prev,
+.post-nav-next {
+  flex: 1;
+  min-width: 0;
+}
+
+.post-nav-prev a,
+.post-nav-next a {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-nav-back {
+  flex-shrink: 0;
+}
+
+.post-nav-next {
+  text-align: right;
+}
+
+/* Project list */
+.project-list {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0;
+}
+
+.project-list li {
+  margin-bottom: 1.2rem;
+}
+
+.project-list a {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8em;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.9);
+  transition: color 0.2s;
+}
+
+.project-list a:hover {
+  color: #fff;
+}
+
+.project-name {
+  font: 14px/1.3 var(--mono-font);
+  font-weight: 700;
+}
+
+.project-lang {
+  font: 11px/1 var(--mono-font);
+  opacity: 0.4;
+  text-transform: uppercase;
+}
+
+.project-desc {
+  margin: 0.3em 0 0;
+  font: 13px/1.5 var(--serif-font);
+  opacity: 0.6;
+}
+
+.project-footnote {
+  margin-top: 2rem;
+  font: 12px/1.5 var(--mono-font);
+  opacity: 0.4;
+}
+
+/* Blog index list */
+.blog-list {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0;
+}
+
+.blog-list li {
+  margin-bottom: 1rem;
+  padding: 0;
+}
+
+.blog-list a {
+  display: block;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.9);
+  transition: color 0.2s;
+}
+
+.blog-list a:hover {
+  color: #fff;
+}
+
+.blog-list .post-date {
+  font: 13px/1 var(--mono-font);
+  opacity: 0.5;
+  display: block;
+  margin-bottom: 0.3em;
+}
+
+.blog-list .post-title {
+  font: 18px/1.3 var(--serif-font);
+  font-style: italic;
+}
+
+/* ==========================================================================
+   LAYER 200: Chrome — always in corners
+   ========================================================================== */
+
+#fps {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  color: white;
+  font: 16px var(--mono-font);
+  background: rgba(0,0,0,0.5);
+  padding: 5px 10px;
+  z-index: 200;
+  display: none;
+}
+
+#fps.visible {
+  display: block;
+}
+
+.top-nav {
+  position: fixed;
+  top: var(--chrome-inset);
+  right: var(--chrome-inset);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-link {
+  font: 14px/1 var(--mono-font);
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  padding: 2px 5px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+#site-footer {
+  position: fixed;
+  bottom: var(--chrome-inset);
+  left: var(--chrome-inset);
+  z-index: 200;
+  color: rgba(255, 255, 255, 0.7);
+  font: 14px/1 var(--mono-font);
+  padding: 6px 10px;
+  transition: color 0.2s, background 0.2s;
+}
+
+#site-footer:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+#site-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.colophon {
+  display: inline-block;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  opacity: 0;
+  transition: max-width 0.3s ease, opacity 0.3s ease;
+}
+
+#site-footer:hover .colophon {
+  max-width: 6em;
+  opacity: 0.7;
+}
+
+.bottom-controls {
+  position: fixed;
+  bottom: var(--chrome-inset);
+  right: var(--chrome-inset);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+#theme-toggle {
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.7);
+  font: 14px/1 var(--mono-font);
+  padding: 6px 10px;
+  transition: color 0.2s ease;
+}
+
+#theme-toggle:hover {
+  color: #fff;
+}
+
+#theme-toggle .value {
+  margin-inline-start: 0.15em;
+}
+
+.lang-picker {
+  position: relative;
+  z-index: 220;
+  pointer-events: auto;
+}
+
+#lang-toggle {
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.7);
+  font: 14px/1 var(--mono-font);
+  padding: 6px 10px;
+  transition: color 0.2s ease;
+  position: relative;
+  z-index: 221;
+  pointer-events: auto;
+}
+
+#lang-toggle:hover {
+  color: #fff;
+}
+
+/* ==========================================================================
+   LAYER 210: Dropdowns
+   ========================================================================== */
+
+.lang-menu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 8px;
+  z-index: 230;
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  list-style: none;
+  padding: 6px 0;
+  min-width: 160px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.lang-menu:not([hidden]) {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.lang-menu::-webkit-scrollbar { width: 6px; }
+.lang-menu::-webkit-scrollbar-track { background: transparent; }
+.lang-menu::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+
+.lang-menu li { padding: 0; margin: 0; }
+
+.lang-menu button {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.8);
+  font: 13px/1.4 var(--mono-font);
+  padding: 8px 16px;
+  text-align: start;
+  transition: background 0.15s ease, color 0.15s ease;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1.2em auto;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.lang-menu button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 1);
+}
+
+.lang-menu button[aria-selected="true"] {
+  color: rgba(255, 255, 255, 1);
+}
+
+.lang-menu .lang-check {
+  width: 1.2em;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0;
+}
+
+.lang-menu button[aria-selected="true"] .lang-check {
+  opacity: 0.7;
+}
+
+.lang-menu .lang-code {
+  opacity: 0.5;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   404 Error Page
+   ========================================================================== */
+
+.error-text {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font: 15px/1.5 var(--mono-font);
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.05em;
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* Hide chrome on 404 */
+.error-home {
+  display: block;
+  margin-top: 2rem;
+  font: 24px/1 var(--mono-font);
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.8s ease, color 0.2s ease;
+}
+
+.error-home.visible {
+  opacity: 1;
+}
+
+.error-home:hover {
+  color: #fff;
+}
+
+/* Hide chrome on 404 */
+body:has(.page[data-page-type="404"]) .top-nav,
+body:has(.page[data-page-type="404"]) #site-footer,
+body:has(.page[data-page-type="404"]) .bottom-controls {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+.mono-bold { font-weight: 700; }
+.mono-light { font-weight: 300; }
+.mono-caps { text-transform: uppercase; letter-spacing: 0.12em; }
+.mono-spaced { letter-spacing: 0.3em; }
+
+/* ==========================================================================
+   Responsive: Medium (< 800px)
+   ========================================================================== */
+
+@media (max-width: 800px) {
+  :root { --chrome-inset: 40px; }
+
+  .content-card {
+    padding: 40px 32px 44px;
+  }
+
+
+  .homepage-hero h1 {
+    font-size: 2.2rem;
+  }
+}
+
+/* ==========================================================================
+   Responsive: Small (< 520px)
+   ========================================================================== */
+
+@media (max-width: 520px) {
+  :root { --chrome-inset: 16px; }
+
+  .top-nav {
+    top: var(--chrome-inset);
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    gap: 10px;
+  }
+
+  .nav-link {
+    font-size: 12px;
+  }
+
+  #site-footer {
+    bottom: var(--chrome-inset);
+    left: var(--chrome-inset);
+  }
+
+  .bottom-controls {
+    bottom: var(--chrome-inset);
+    right: var(--chrome-inset);
+  }
+
+  .content-overlay {
+    top: calc(var(--chrome-inset) + 30px);
+    bottom: calc(var(--chrome-inset) + 28px);
+  }
+
+  .content-card {
+    margin: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    padding: 36px 20px 40px;
+  }
+
+
+  .homepage-hero h1 {
+    font-size: 1.8rem;
+  }
+
+  .bottom-controls {
+    gap: 8px;
+  }
+
+  #lang-toggle,
+  #theme-toggle {
+    padding: 6px 6px;
+  }
+
+  .lang-menu {
+    min-width: 140px;
+  }
+
+  .blog-list .post-title {
+    font-size: 16px;
+  }
+}

@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+
+{% block body %}
+  <div class="content-overlay">
+    <div class="content-card">
+      <a href="/" class="close-btn" aria-label="Back to home">&times;</a>
+      <h1>{{ page.title }}</h1>
+      {% if github_repos %}
+      <ul class="project-list">
+        {% for repo in github_repos %}
+        <li>
+          <a href="{{ repo.url }}" target="_blank" rel="noopener noreferrer">
+            <span class="project-name">{{ repo.name }}</span>
+            {% if repo.language %}<span class="project-lang">{{ repo.language }}</span>{% endif %}
+          </a>
+          {% if repo.description %}<p class="project-desc">{{ repo.description }}</p>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <p class="project-footnote"><em>I should probably have more public projects...</em></p>
+    </div>
+  </div>
+{% endblock %}

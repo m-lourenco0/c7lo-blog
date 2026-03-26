@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }} | c7lo</title>
+
+  {# SEO meta tags #}
+  {% set default_description = "c7lo's personal blog" %}
+  {% set meta_description = description if description else default_description %}
+  <meta name="description" content="{{ meta_description }}">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="c7lo">
+  <meta property="og:title" content="{{ title }} | c7lo">
+  <meta property="og:description" content="{{ meta_description }}">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{{ title }} | c7lo">
+  <meta name="twitter:description" content="{{ meta_description }}">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon/square.svg">
+  <link rel="icon" type="image/x-icon" href="/static/favicon/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon/android-chrome-192x192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/static/favicon/android-chrome-512x512.png">
+  <link rel="preload" href="/static/fonts/SpaceMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/SourceSerif4-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/fonts/space-mono.css">
+  <link rel="stylesheet" href="/static/fonts/source-serif.css">
+  <link rel="stylesheet" href="/static/styles.css">
+  <link href="/posts/feed.atom" rel="alternate" title="c7lo blog" type="application/atom+xml">
+  <link href="/posts/feed.rss" rel="alternate" title="c7lo blog" type="application/rss+xml">
+</head>
+<body hx-boost="true" hx-ext="head-support" hx-select="div.page" hx-target="div.page" hx-swap="outerHTML">
+  <!-- Custom cursor -->
+  <div class="cursor-dot" id="cursor-dot"></div>
+  <div class="cursor-ring" id="cursor-ring"></div>
+
+  <!-- Background layer -->
+  <canvas id="canvas"></canvas>
+
+  <!-- Page content layer -->
+  <div class="page" hx-history-elt{% block page_attrs %}{% endblock %}>
+    {% block body %}{% endblock %}
+  </div>
+
+  <!-- Chrome layer (always on top) -->
+  <div id="fps">FPS: --</div>
+
+  <nav class="top-nav" dir="ltr">
+    <a class="nav-link" href="/posts/">Blog</a>
+    <a class="nav-link" href="/about/">About</a>
+    <a class="nav-link" href="/projects/">Projects</a>
+    <a class="nav-link" href="/credits/">Credits</a>
+  </nav>
+
+  <div id="site-footer" dir="ltr"><a href="/">c7lo</a> <span class="colophon">· arrs</span></div>
+
+  <div class="bottom-controls" dir="ltr">
+    <button id="theme-toggle" type="button" aria-label="Toggle color theme"><span class="value"></span></button>
+  </div>
+
+  <script src="/static/htmx-bundle.min.js"></script>
+  <script>
+    htmx.config.scrollIntoViewOnBoost = false;
+
+    function htmxFallbackToNative(evt) {
+      var path = evt.detail?.pathInfo?.requestPath || evt.detail?.requestConfig?.path;
+      if (path) {
+        window.location.href = path;
+      }
+    }
+
+    htmx.on('htmx:sendError', htmxFallbackToNative);
+    htmx.on('htmx:swapError', htmxFallbackToNative);
+    htmx.on('htmx:responseError', htmxFallbackToNative);
+
+    htmx.on('htmx:beforeSwap', function() {
+      document.body.classList.add('skip-intro');
+    });
+
+    function onPageReady() {
+      var c = document.getElementById('canvas');
+      if (c && !c.classList.contains('shader-ready')) c.classList.add('shader-ready');
+      document.dispatchEvent(new CustomEvent('c7lo:pageReady'));
+    }
+
+    htmx.on('htmx:afterSettle', onPageReady);
+    htmx.on('htmx:historyRestore', onPageReady);
+  </script>
+  <script src="/static/script.js"></script>
+</body>
+</html>
