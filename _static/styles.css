@@ -124,6 +124,10 @@ canvas.shader-ready {
   z-index: 100;
 }
 
+.page:has(.content-overlay) {
+  position: static;
+}
+
 /* --- Homepage hero --- */
 
 body:has(.homepage-hero) .page {
