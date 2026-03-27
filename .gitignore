@@ -1,4 +1,5 @@
 /_build/
+*.zip
 /.venv
 /api/node_modules/
 /api/dist/
