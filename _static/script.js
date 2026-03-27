@@ -363,7 +363,7 @@ function loadBwPreference() {
     var stored = localStorage.getItem(BW_STORAGE_KEY);
     if (stored === 'false') return false;
   } catch (e) {}
-  return true; // default to B&W
+  return false; // default to Color
 }
 
 var isBW = loadBwPreference();
