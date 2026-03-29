@@ -742,3 +742,34 @@ requestAnimationFrame(render);
     }
   });
 })();
+
+// ─── Keyboard navigation ───
+(function() {
+  function isTyping() {
+    var tag = document.activeElement && document.activeElement.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  window.addEventListener('keydown', function(e) {
+    if (isTyping()) return;
+
+    // Escape → close card (same as close button)
+    if (e.key === 'Escape') {
+      var closeBtn = document.querySelector('.content-card .close-btn');
+      if (closeBtn) closeBtn.click();
+      return;
+    }
+
+    // j/ArrowRight → next post, k/ArrowLeft → previous post
+    if (e.key === 'j' || e.key === 'ArrowRight') {
+      var next = document.querySelector('.post-nav-next a');
+      if (next) next.click();
+      return;
+    }
+    if (e.key === 'k' || e.key === 'ArrowLeft') {
+      var prev = document.querySelector('.post-nav-prev a');
+      if (prev) prev.click();
+      return;
+    }
+  });
+})();
