@@ -14,4 +14,8 @@ This is not a portfolio by any means, it's just my public personal space on the 
 
 *I'm happy to have you here! :D I hope you can learn more about me by wandering my place.*
 
+## Contact
+
+Feel free to reach out at [mlourencosantos_@hotmail.com](mailto:mlourencosantos_@hotmail.com).
+
 *[GenAI]: Generative Artificial Intelligence
