@@ -39,6 +39,28 @@ GITHUB_USERNAME = "m-lourenco0"
 UPDATES_FEED_LIMIT = 10
 UPDATE_IGNORED_FILES = {"_index.md"}
 
+# Files in _static/ that are intentionally NOT copied into the deployed site.
+# The sources stay in the repo; the build just doesn't ship them.
+#   - .otf/.ttf/.zip: font fallbacks/archives superseded by the .woff2 files
+#     that every browser the site supports uses (the site relies on :has(),
+#     WebGL and htmx). This removes ~12 MB of Commit Mono weights plus
+#     duplicates that no stylesheet loaded by _templates/layout.html uses.
+#   - the two full Source Serif 4 variable fonts are replaced by glyph subsets
+#     (see _static/fonts/source-serif.css).
+#   - unloaded JS helpers (i18n is disabled and nothing references them).
+STATIC_EXCLUDE_FILES = {
+    "SourceSerif4-Variable.woff2",
+    "SourceSerif4-Italic-Variable.woff2",
+    "i18n.js",
+    "purify.min.js",
+    "htmx-preload.min.js",
+}
+STATIC_EXCLUDE_SUFFIXES = (".otf", ".ttf", ".zip")
+
+# Cache for the GitHub repo lookup, so watch-mode rebuilds don't wait on network.
+GITHUB_CACHE_FILE = ROOT / ".cache" / "github-repos.json"
+GITHUB_CACHE_TTL = 3600  # seconds
+
 
 def parse_frontmatter(raw: str) -> Tuple[dict[str, Any], str]:
     match = FRONTMATTER_RE.match(raw)
@@ -99,12 +121,16 @@ def fetch_github_repos(username: str, max_repos: int = 20) -> list[dict[str, Any
     """Fetch pinned repos from GitHub profile, falling back to recent repos.
 
     Too lazy to create a public api key, too smart to have to set the pinned repos by hand.
+    Results are cached on disk so watch-mode rebuilds don't hit the network every time.
     """
+    cached = _read_github_cache(username)
+    if cached is not None:
+        return cached
     try:
         # Scrape pinned repo names from the profile page
         from urllib.request import Request
         req = Request(f"https://github.com/{username}", headers={"User-Agent": "Mozilla/5.0"})
-        with urlopen(req) as resp:
+        with urlopen(req, timeout=10) as resp:
             html = resp.read().decode()
         pinned_names = re.findall(r'class="repo"[^>]*>([^<]+)</span>', html)
 
@@ -113,7 +139,7 @@ def fetch_github_repos(username: str, max_repos: int = 20) -> list[dict[str, Any
             repos = []
             for name in pinned_names:
                 url = f"https://api.github.com/repos/{username}/{name.strip()}"
-                with urlopen(url) as resp:
+                with urlopen(url, timeout=10) as resp:
                     r = json.loads(resp.read())
                 repos.append({
                     "name": r["name"],
@@ -122,11 +148,12 @@ def fetch_github_repos(username: str, max_repos: int = 20) -> list[dict[str, Any
                     "stars": r["stargazers_count"],
                     "language": r.get("language") or "",
                 })
+            _write_github_cache(username, repos)
             return repos
 
         # Fallback: fetch recent repos
         url = f"https://api.github.com/users/{username}/repos?sort=created&direction=desc&per_page={max_repos}&type=public"
-        with urlopen(url) as resp:
+        with urlopen(url, timeout=10) as resp:
             data = json.loads(resp.read())
         repos = []
         for r in data:
@@ -139,10 +166,34 @@ def fetch_github_repos(username: str, max_repos: int = 20) -> list[dict[str, Any
                 "stars": r["stargazers_count"],
                 "language": r.get("language") or "",
             })
+        _write_github_cache(username, repos)
         return repos
     except Exception as e:
         print(f"  Warning: Could not fetch GitHub repos: {e}", flush=True)
-        return []
+        # Prefer stale data over an empty projects page.
+        return _read_github_cache(username, allow_stale=True) or []
+
+
+def _read_github_cache(username: str, allow_stale: bool = False) -> list[dict[str, Any]] | None:
+    try:
+        data = json.loads(GITHUB_CACHE_FILE.read_text())
+    except (OSError, ValueError):
+        return None
+    if data.get("username") != username:
+        return None
+    if not allow_stale and time.time() - data.get("fetched_at", 0) > GITHUB_CACHE_TTL:
+        return None
+    return data.get("repos")
+
+
+def _write_github_cache(username: str, repos: list[dict[str, Any]]) -> None:
+    try:
+        GITHUB_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        GITHUB_CACHE_FILE.write_text(
+            json.dumps({"username": username, "fetched_at": time.time(), "repos": repos})
+        )
+    except OSError as e:
+        print(f"  Warning: Could not write GitHub cache: {e}", flush=True)
 
 
 def slug_for_path(path: Path) -> str:
@@ -337,14 +388,22 @@ def build_update_feeds(updates, build_dir: Path) -> None:
 
 
 
+def _static_copy_ignore(root: str, names: list[str]) -> set[str]:
+    return {
+        name
+        for name in names
+        if name in STATIC_EXCLUDE_FILES or name.endswith(STATIC_EXCLUDE_SUFFIXES)
+    }
+
+
 def build_to(build_dir: Path) -> None:
     if build_dir.exists():
         shutil.rmtree(build_dir)
     build_dir.mkdir(parents=True, exist_ok=True)
 
     if STATIC_DIR.exists():
-        shutil.copytree(STATIC_DIR, build_dir / "static")
-        static_files = list(STATIC_DIR.rglob("*"))
+        shutil.copytree(STATIC_DIR, build_dir / "static", ignore=_static_copy_ignore)
+        static_files = list((build_dir / "static").rglob("*"))
         static_count = sum(1 for f in static_files if f.is_file())
         print(f"  Copied {static_count} static files", flush=True)
 
@@ -458,6 +517,7 @@ def build() -> None:
 HOST = "0.0.0.0"
 PORT = 8000
 DEBOUNCE_DELAY = 0.3
+SSE_KEEPALIVE_SECONDS = 15
 IGNORE_DIRS = {"_build", "_build_tmp", ".git"}
 
 # Global dictionary to track reload events by connection ID
@@ -522,7 +582,9 @@ class LiveReloadHandler(SimpleHTTPRequestHandler):
 
             while True:
                 try:
-                    if reload_event.wait(timeout=0.1):
+                    # Wake up only for a reload or once per keepalive interval
+                    # (polling every 100ms here wasted a thread wakeup per tick).
+                    if reload_event.wait(timeout=SSE_KEEPALIVE_SECONDS):
                         self.wfile.write(b"data: reload\n\n")
                         self.wfile.flush()
                         break
