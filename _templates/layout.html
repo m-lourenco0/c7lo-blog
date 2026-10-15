@@ -28,7 +28,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon/android-chrome-192x192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/static/favicon/android-chrome-512x512.png">
   <link rel="preload" href="/static/fonts/SpaceMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/static/fonts/SourceSerif4-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/SourceSerif4-Variable-subset.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/fonts/space-mono.css">
   <link rel="stylesheet" href="/static/fonts/source-serif.css">
   <link rel="stylesheet" href="/static/styles.css">
@@ -81,11 +81,13 @@
 
     htmx.on('htmx:beforeSwap', function() {
       document.body.classList.add('skip-intro');
+      window.__c7loRenderPaused = true;
     });
 
     function onPageReady() {
       var c = document.getElementById('canvas');
       if (c && !c.classList.contains('shader-ready')) c.classList.add('shader-ready');
+      window.__c7loRenderPaused = false;
       document.dispatchEvent(new CustomEvent('c7lo:pageReady'));
     }
 

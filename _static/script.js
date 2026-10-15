@@ -15,11 +15,20 @@ if (new URLSearchParams(window.location.search).has('fps')) {
 }
 
 var canvas = document.getElementById('canvas');
-var gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
+var gl = canvas.getContext('webgl', {
+  alpha: false,               // canvas is fully painted every frame
+  depth: false,               // no depth buffer needed (full-screen quads only)
+  stencil: false,
+  antialias: false,           // MSAA has no visible effect on full-screen quads
+  preserveDrawingBuffer: false // the S-key snapshot is captured in-frame instead
+});
 if (!gl) {
   console.error('WebGL not supported');
   return;
 }
+
+// Cached canvas rect (position:fixed, so it only changes on resize)
+var canvasRect = canvas.getBoundingClientRect();
 
 // ─── Quality settings ───
 var QUALITY_LEVELS = ['low', 'medium', 'high'];
@@ -34,7 +43,7 @@ var currentQuality = 'high';
 // Adaptive quality
 var AUTO_QUALITY_FPS_LOW = 28;
 var AUTO_QUALITY_FPS_HIGH = 55;
-var AUTO_QUALITY_SAMPLE_TIME = 2000;
+var AUTO_QUALITY_SAMPLES = 5; // ~5s of samples at the 1s FPS cadence
 var AUTO_QUALITY_COOLDOWN = 4000;
 var autoQualityFpsHistory = [];
 var lastQualityChangeTime = 0;
@@ -312,11 +321,20 @@ function resize() {
   var isLowDpi = window.devicePixelRatio < LOW_DPI_THRESHOLD;
   var settings = QUALITY_SETTINGS[currentQuality];
   var scale = isLowDpi ? settings.lowDpiScale : settings.scale;
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
-  canvas.width = Math.round(width * window.devicePixelRatio * scale);
-  canvas.height = Math.round(height * window.devicePixelRatio * scale);
-  setupFramebuffer(canvas.width, canvas.height);
+  var bufferWidth = Math.round(width * window.devicePixelRatio * scale);
+  var bufferHeight = Math.round(height * window.devicePixelRatio * scale);
+  var cssWidth = width + 'px';
+  var cssHeight = height + 'px';
+  if (canvas.style.width !== cssWidth) canvas.style.width = cssWidth;
+  if (canvas.style.height !== cssHeight) canvas.style.height = cssHeight;
+  // Reassigning canvas.width/height reallocates (and clears) the drawing buffer,
+  // so skip it when the buffer size is unchanged (e.g. pinch-zoom resize spam).
+  if (canvas.width !== bufferWidth || canvas.height !== bufferHeight) {
+    canvas.width = bufferWidth;
+    canvas.height = bufferHeight;
+    setupFramebuffer(bufferWidth, bufferHeight);
+  }
+  canvasRect = canvas.getBoundingClientRect();
 }
 
 window.addEventListener('resize', resize);
@@ -335,8 +353,9 @@ function setQuality(quality) {
 
 function updateAutoQuality(time, fps) {
   autoQualityFpsHistory.push({ time: time, fps: fps });
-  var cutoff = time - AUTO_QUALITY_SAMPLE_TIME;
-  while (autoQualityFpsHistory.length > 0 && autoQualityFpsHistory[0].time < cutoff) {
+  // Keep a fixed number of recent samples. (A time window shorter than the
+  // sampling interval can never hold enough samples and never triggers.)
+  if (autoQualityFpsHistory.length > AUTO_QUALITY_SAMPLES) {
     autoQualityFpsHistory.shift();
   }
   if (autoQualityFpsHistory.length < 3) return;
@@ -393,9 +412,8 @@ var smoothMouseX = 0, smoothMouseY = 0;
 var MOUSE_SMOOTH = 0.08;
 
 window.addEventListener('mousemove', function(e) {
-  var rect = canvas.getBoundingClientRect();
-  mouseX = (e.clientX - rect.left) / rect.width * canvas.width;
-  mouseY = (1 - (e.clientY - rect.top) / rect.height) * canvas.height;
+  mouseX = (e.clientX - canvasRect.left) / canvasRect.width * canvas.width;
+  mouseY = (1 - (e.clientY - canvasRect.top) / canvasRect.height) * canvas.height;
 });
 
 // ─── Ripple system ───
@@ -403,22 +421,23 @@ var MAX_RIPPLES = 10;
 var ripples = [];
 
 canvas.addEventListener('click', function(e) {
-  var rect = canvas.getBoundingClientRect();
-  var x = (e.clientX - rect.left) / rect.width;
-  var y = (1 - (e.clientY - rect.top) / rect.height) * (canvas.height / canvas.width);
+  var x = (e.clientX - canvasRect.left) / canvasRect.width;
+  var y = (1 - (e.clientY - canvasRect.top) / canvasRect.height) * (canvas.height / canvas.width);
   ripples.push({ x: x, y: y, time: performance.now() * 0.001 + daySeed, amplitude: 0.06 });
   if (ripples.length > MAX_RIPPLES) ripples.shift();
 });
 
+// Reused every frame so the render loop does not allocate (Float32Array(40) per frame).
+var rippleUniformData = new Float32Array(MAX_RIPPLES * 4);
 function getRippleUniforms() {
-  var data = new Float32Array(MAX_RIPPLES * 4);
+  rippleUniformData.fill(0);
   for (var i = 0; i < ripples.length; i++) {
-    data[i * 4 + 0] = ripples[i].x;
-    data[i * 4 + 1] = ripples[i].y;
-    data[i * 4 + 2] = ripples[i].time;
-    data[i * 4 + 3] = ripples[i].amplitude;
+    rippleUniformData[i * 4 + 0] = ripples[i].x;
+    rippleUniformData[i * 4 + 1] = ripples[i].y;
+    rippleUniformData[i * 4 + 2] = ripples[i].time;
+    rippleUniformData[i * 4 + 3] = ripples[i].amplitude;
   }
-  return data;
+  return rippleUniformData;
 }
 
 // ─── Welcome-back ripple ───
@@ -469,9 +488,20 @@ var daySeed = ((today.getFullYear() * 366 + today.getMonth() * 31 + today.getDat
 var frameCount = 0;
 var lastFpsUpdate = 0;
 var shaderReady = false;
+var snapshotRequested = false;
+
+// Used by the S-key snapshot handler below.
+window.__c7loSnapshot = function() {
+  snapshotRequested = true;
+};
 
 // ─── Render loop ───
+
 function render(time) {
+  if (window.__c7loRenderPaused) {
+    requestAnimationFrame(render);
+    return;
+  }
   frameCount++;
   if (time - lastFpsUpdate >= 1000) {
     var fps = frameCount;
@@ -529,6 +559,16 @@ function render(time) {
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
+  // Capture the S-key snapshot in the same frame as the draw: with
+  // preserveDrawingBuffer=false the buffer is only valid until compositing.
+  if (snapshotRequested) {
+    snapshotRequested = false;
+    var snapshotLink = document.createElement('a');
+    snapshotLink.download = 'c7lo-' + Date.now() + '.png';
+    snapshotLink.href = canvas.toDataURL('image/png');
+    snapshotLink.click();
+  }
+
   if (!shaderReady && program) {
     shaderReady = true;
     canvas.classList.add('shader-ready');
@@ -552,12 +592,23 @@ requestAnimationFrame(render);
   var cx = -100, cy = -100;
   var rx = -100, ry = -100;
   var prevCx = -100, prevCy = -100;
+  var dotX = NaN, dotY = NaN;
+  var ringX = NaN, ringY = NaN, ringTransform = '';
   var lastTime = 0;
+  var rafId = 0;
   var smoothing = 18; // higher = snappier ring follow
+
+  function requestTick(resumeFromIdle) {
+    if (!rafId) {
+      if (resumeFromIdle) lastTime = 0; // resume with a normal frame delta
+      rafId = requestAnimationFrame(tick);
+    }
+  }
 
   window.addEventListener('mousemove', function(e) {
     cx = e.clientX;
     cy = e.clientY;
+    requestTick(true);
   });
 
   window.addEventListener('mousedown', function() {
@@ -577,30 +628,59 @@ requestAnimationFrame(render);
   });
 
   function tick(now) {
+    rafId = 0;
     var dt = lastTime ? (now - lastTime) / 1000 : 0.016;
     lastTime = now;
     var t = 1 - Math.exp(-smoothing * dt);
 
-    dot.style.left = cx + 'px';
-    dot.style.top = cy + 'px';
+    if (cx !== dotX || cy !== dotY) {
+      dot.style.left = cx + 'px';
+      dot.style.top = cy + 'px';
+      dotX = cx;
+      dotY = cy;
+    }
 
     rx += (cx - rx) * t;
     ry += (cy - ry) * t;
-    ring.style.left = rx + 'px';
-    ring.style.top = ry + 'px';
 
     var vx = cx - prevCx;
     var vy = cy - prevCy;
     var speed = Math.sqrt(vx * vx + vy * vy);
-    var stretch = Math.min(speed * 0.02, 0.3);
-    var angle = Math.atan2(vy, vx) * 180 / Math.PI;
-    ring.style.transform = 'translate(-50%,-50%) rotate(' + angle + 'deg) scaleX(' + (1 + stretch) + ') scaleY(' + (1 - stretch * 0.3) + ')';
+    // Snap to rest once the ring has converged: this is the same resting
+    // state the loop used to keep writing every frame.
+    var settled = speed < 0.05 && Math.abs(cx - rx) < 0.05 && Math.abs(cy - ry) < 0.05;
+    var stretch, angle;
+    if (settled) {
+      rx = cx;
+      ry = cy;
+      stretch = 0;
+      angle = 0;
+    } else {
+      stretch = Math.min(speed * 0.02, 0.3);
+      angle = Math.atan2(vy, vx) * 180 / Math.PI;
+    }
+
+    if (rx !== ringX || ry !== ringY) {
+      ring.style.left = rx + 'px';
+      ring.style.top = ry + 'px';
+      ringX = rx;
+      ringY = ry;
+    }
+
+    var transform = 'translate(-50%,-50%) rotate(' + angle + 'deg) scaleX(' + (1 + stretch) + ') scaleY(' + (1 - stretch * 0.3) + ')';
+    if (transform !== ringTransform) {
+      ring.style.transform = transform;
+      ringTransform = transform;
+    }
 
     prevCx = cx;
     prevCy = cy;
-    requestAnimationFrame(tick);
+
+    // Stop scheduling frames while the pointer is at rest.
+    if (!settled) requestTick(false);
   }
-  requestAnimationFrame(tick);
+
+  requestTick(false);
 })();
 
 // ─── Canvas snapshot (press S to save) ───
@@ -611,10 +691,7 @@ requestAnimationFrame(render);
     if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       var tag = document.activeElement && document.activeElement.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      var link = document.createElement('a');
-      link.download = 'c7lo-' + Date.now() + '.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      if (window.__c7loSnapshot) window.__c7loSnapshot();
     }
   });
 })();
