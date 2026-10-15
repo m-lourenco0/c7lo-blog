@@ -16,6 +16,6 @@ This is not a portfolio by any means, it's just my public personal space on the 
 
 ## Contact
 
-Feel free to reach out at [mlourencosantos_@hotmail.com](mailto:mlourencosantos_@hotmail.com).
+Feel free to reach out at <a class="c7lo-email" data-user="mlourencosantos_" data-domain="hotmail.com">mlourencosantos_ [at] hotmail [dot] com</a>.
 
 *[GenAI]: Generative Artificial Intelligence

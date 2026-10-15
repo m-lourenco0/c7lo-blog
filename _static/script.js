@@ -793,6 +793,22 @@ requestAnimationFrame(render);
   document.addEventListener('c7lo:pageReady', swapAbbrTitles);
 })();
 
+// ─── Contact email assembly ───
+// The address is split into data attributes so it never appears literally in
+// the served HTML. That keeps it out of reach of scrapers and of Cloudflare's
+// email obfuscation (whose decoder script does not run for htmx swaps).
+(function() {
+  function initEmails() {
+    document.querySelectorAll('a.c7lo-email[data-user][data-domain]').forEach(function(link) {
+      var address = link.getAttribute('data-user') + '@' + link.getAttribute('data-domain');
+      link.setAttribute('href', 'mailto:' + address);
+      if (link.textContent !== address) link.textContent = address;
+    });
+  }
+  initEmails();
+  document.addEventListener('c7lo:pageReady', initEmails);
+})();
+
 // ─── Nav active state ───
 (function() {
   function updateActiveNav() {
